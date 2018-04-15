@@ -1,0 +1,167 @@
+---
+title: "Reproducible Research"
+author: "Maithili"
+date: "April 14, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Intial Setup: Download data source zip file, extract and read it
+```{r File Setup,results='hold'}
+if (!file.exists('repdata'))
+  dir.create('repdata')
+  if (!file.exists('./repdata/repdata%2Fdata%2Factivity.zip')) {
+  filepath <-
+  'https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip'
+  download.file(filepath, './repdata/repdata%2Fdata%2Factivity.zip')
+  }
+  if (!file.exists('./repdata/activity.csv'))
+  {
+  unzip('./repdata/repdata%2Fdata%2Factivity.zip', exdir = './repdata')
+  }
+  activity <- read.csv('./repdata/activity.csv'
+  , header = TRUE)
+
+```
+  
+Calculate total steps per date
+```{r Calculate total Steps}
+library("dplyr")
+  activity_steps<-select(activity, steps, date)%>%
+  group_by(date)%>%
+  summarise(daily_steps = sum(steps, na.rm = TRUE)
+  )
+```
+
+Histogram, mean and median for steps taken daily
+```{r plots}
+mean(activity_steps$daily_steps,na.rm = TRUE)
+median(activity_steps$daily_steps,na.rm = TRUE)
+hist(activity_steps$daily_steps,xlab="Daily steps")
+```
+
+
+ Mean and median for steps taken daily
+```{r MeanMedian}
+mean(activity_steps$daily_steps,na.rm = TRUE)
+median(activity_steps$daily_steps,na.rm = TRUE)
+
+```
+
+Plot histogram for daily step count
+```{r histogram}
+#Plot histogram for daily step count
+hist(activity_steps$daily_steps,
+     breaks = 20,
+     xlab = "Daily steps")
+```
+
+
+Calculate average steps for every interval and plot the timeseries
+```{r Timeseries}
+#Calculate mean steps for every interval
+activity_ts <- select(activity, steps, interval) %>%
+  group_by(interval) %>%
+  summarise(daily_steps = mean(steps, na.rm = TRUE))
+
+#Plot
+plot(activity_ts
+     ,type = "l"
+     ,xlab = "Interval"
+     ,ylab = "Daily Step Count")
+```
+
+
+Get max step count and its interval
+```{r Max}
+#Get the max step count and its interval
+maxsteps <- max(activity_ts$daily_steps)
+activity_ts[activity_ts$daily_steps == maxsteps,]
+```
+
+Replace missing values with averate step count for each interval
+```{r Imputation}
+#Get the mean step count for each interval
+steps_mean_interval <- select(activity, steps, interval) %>%
+  group_by(interval) %>%
+  summarise(daily_steps = mean(steps, na.rm = TRUE))
+
+#Impute missng values with mean step count for each interval
+activity_imp <- activity
+for (i in 1:length(activity_imp$date)) {
+  if (is.na(activity_imp$steps[i]))
+    activity_imp[i, 1] <-
+      steps_mean_interval[steps_mean_interval$interval == activity_imp$interval[i], 2]
+}
+```
+
+
+Plot histogram for the imputed dataset
+```{r HistImputation}
+#Calculate total steps for each date on imputed data
+activity_imp_steps <- select(activity_imp, steps, date) %>%
+  group_by(date) %>%
+  summarise(daily_steps = sum(steps))
+
+
+#Plot histogram for the new dataset
+hist(activity_imp_steps$daily_steps, xlab = "Daily steps")
+```
+
+ Mean and median for steps taken daily
+```{r MeanMedianImputation}
+#Calculate new mean and median
+mean(activity_imp_steps$daily_steps, na.rm = TRUE)
+median(activity_imp_steps$daily_steps, na.rm = TRUE)
+```
+
+Split the imputed dateset into weekday and weekends
+```{r Split}
+#Add a column identifying the day of the week(Weekend/Weekday) based on the date
+activity_imp$day <- ifelse(
+  weekdays(as.Date(activity_imp$date)) == "Saturday"
+  | weekdays(as.Date(activity_imp$date)) == "Sunday",
+  "Weekend",
+  "Weekday"
+)
+
+#Split the imputed table into two tables with means for weekend and weekday
+StepsPerInterval.weekend <- tapply(activity_imp[activity_imp$day == "Weekend" ,]$steps,
+         activity_imp[activity_imp$day == "Weekend" ,]$interval,mean)
+
+StepsPerInterval.weekday <-tapply(activity_imp[activity_imp$day == "Weekday" ,]$steps,
+         activity_imp[activity_imp$day == "Weekday" ,]$interval,mean)
+```
+
+Plot the stepcounts for weekends 
+```{r Weekend vs Weekday}
+# Define the panel parameters
+par(mfrow = c(1, 2))
+
+# Plot step couunt for weekdays 
+plot(
+  as.numeric(names(StepsPerInterval.weekday)),
+  StepsPerInterval.weekday,
+  xlab = "Interval",
+  ylab = "Step Count",
+  type = "l",
+  main = "Weekday Pattern"
+)
+
+## Plot step count for Weekends 
+plot(
+  as.numeric(names(StepsPerInterval.weekend)),
+  StepsPerInterval.weekend,
+  type = "l",
+  xlab = "Interval",
+  ylab = "Step Count",
+  main = "Weekend Pattern"
+)
+```
+
+
